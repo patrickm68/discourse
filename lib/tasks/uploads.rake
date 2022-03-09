@@ -592,7 +592,10 @@ task "uploads:secure_upload_analyse_and_update" => :environment do
       # Get all uploads in the database, including optimized images. Both media (images, videos,
       # etc) along with attachments (pdfs, txt, etc.) must be loaded because all can be marked as
       # secure based on site settings.
-      uploads_to_update = Upload.includes(:posts, :optimized_images).joins(:post_uploads)
+      uploads_to_update = Upload
+        .includes(:posts, :optimized_images)
+        .joins(:upload_references)
+        .where(upload_references: { target_type: 'Post' })
 
       puts "There are #{uploads_to_update.count} upload(s) that could be marked secure.", ""
 
@@ -690,10 +693,11 @@ def update_uploads_access_control_post
   access_control_post_updates = []
   uploads_with_post_ids = DB.query(<<-SQL
     SELECT upload_id, (
-      SELECT string_agg(CAST(post_uploads.post_id AS varchar), ',' ORDER BY post_uploads.id) as post_ids
-      FROM post_uploads
-      WHERE pu.upload_id = post_uploads.upload_id
-    ) FROM post_uploads pu
+      SELECT string_agg(CAST(upload_references.target_id AS varchar), ',' ORDER BY upload_references.id) as post_ids
+      FROM upload_references
+      WHERE upload_references.upload_id = ur.upload_id AND upload_references.target_type = 'Post'
+    ) FROM upload_references ur
+    WHERE ur.target_type = 'Post'
   SQL
   )
   uploads_with_post_ids.each do |row|
@@ -889,9 +893,9 @@ def analyze_missing_s3
   puts "List of posts with missing images:"
   sql = <<~SQL
     SELECT post_id, url, sha1, extension, uploads.id
-    FROM post_uploads pu
-    RIGHT JOIN uploads on uploads.id = pu.upload_id
-    WHERE verification_status = :invalid_etag
+    FROM upload_references ur
+    RIGHT JOIN uploads on uploads.id = ur.upload_id
+    WHERE ur.target_type = 'Post' AND verification_status = :invalid_etag
     ORDER BY created_at
   SQL
 
@@ -901,9 +905,9 @@ def analyze_missing_s3
 
   DB.query(sql, invalid_etag: Upload.verification_statuses[:invalid_etag]).each do |r|
     all << r
-    if r.post_id
-      lookup[r.post_id] ||= []
-      lookup[r.post_id] << [r.url, r.sha1, r.extension]
+    if r.target_id
+      lookup[r.target_id] ||= []
+      lookup[r.target_id] << [r.url, r.sha1, r.extension]
     else
       other << r
     end
@@ -928,7 +932,7 @@ def analyze_missing_s3
     ids = all.map { |r| r.id }
 
     lookups = [
-      [:post_uploads, :upload_id],
+      [:upload_references, :upload_id],
       [:users, :uploaded_avatar_id],
       [:user_avatars, :gravatar_upload_id],
       [:user_avatars, :custom_upload_id],
