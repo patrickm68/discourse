@@ -1,0 +1,31 @@
+<UserMenu::NotificationItemStructure
+  @notification={{@item}}
+  @title={{this.title}}
+  @icon={{this.icon}}
+  @url={{this.url}}
+>
+  <span>{{this.username}}</span>
+  {{#if this.groupName}}
+    {{#if this.fancyTitle}}
+      {{#if this.topicId}}
+        <span class="mention-group notify">
+          @{{this.groupName}}
+          <span data-topic-id={{this.topicId}}>{{html-safe this.fancyTitle}}</span>
+        </span>
+      {{else}}
+        <span class="mention-group notify">@{{this.groupName}}</span>
+        {{html-safe this.fancyTitle}}
+      {{/if}}
+    {{/if}}
+  {{else if this.fancyTitle}}
+    {{#if this.topicId}}
+      <span data-topic-id={{this.topicId}}>
+        {{html-safe this.fancyTitle}}
+      </span>
+    {{else}}
+      {{html-safe this.fancyTitle}}
+    {{/if}}
+  {{else if this.topicTitle}}
+    {{this.topicTitle}}
+  {{/if}}
+</UserMenu::NotificationItemStructure>

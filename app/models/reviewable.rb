@@ -534,8 +534,40 @@ class Reviewable < ActiveRecord::Base
     result
   end
 
+  # ReviewableAkismetPost : Akismet post #n - <title>
+  # ReviewableAkismetUser : Akismet sus user @someone
+  # ReviewableFlaggedPost : @flagger post#n - <title>
+  # ReviewableQueuedPost : Queued new (post in|topic) <title>
+  # ReviewableUser : System sus user @someone
+  # Reviewable : Review item #<id>
+  def self.recent_list_with_pending_first(user)
+    order_clause = DB.sql_fragment(<<~SQL, pending: statuses[:pending])
+      CASE WHEN reviewables.status = :pending THEN 0 ELSE 1 END,
+      CASE WHEN reviewables.status = :pending THEN reviewables.score END DESC,
+      reviewables.created_at DESC
+    SQL
+    query = Reviewable
+      .includes(:created_by, :topic, :target)
+      .viewable_by(user, preload: false)
+      .except(:order)
+      .order(order_clause)
+      .limit(30)
+
+    min_score = Reviewable.min_score_for_priority
+    if min_score > 0
+      query = query.where(<<~SQL, min_score: min_score)
+        reviewables.score >= :min_score OR reviewables.force_review
+      SQL
+    end
+    query
+  end
+
   def serializer
     self.class.serializer_for(self)
+  end
+
+  def basic_serializer
+    self.class.basic_serializer_for(self)
   end
 
   def self.lookup_serializer_for(type)
@@ -544,10 +576,22 @@ class Reviewable < ActiveRecord::Base
     ReviewableSerializer
   end
 
+  def self.lookup_basic_serializer_for(type)
+    "Basic#{type}Serializer".constantize
+  rescue NameError
+    BasicReviewableSerializer
+  end
+
   def self.serializer_for(reviewable)
     type = reviewable.type
     @@serializers ||= {}
     @@serializers[type] ||= lookup_serializer_for(type)
+  end
+
+  def self.basic_serializer_for(reviewable)
+    type = reviewable.type
+    @@basic_serializers ||= {}
+    @@basic_serializers[type] ||= lookup_basic_serializer_for(type)
   end
 
   def create_result(status, transition_to = nil)

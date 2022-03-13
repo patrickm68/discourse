@@ -1,0 +1,19 @@
+<UserMenu::NotificationItemStructure
+  @notification={{@item}}
+  @title={{this.title}}
+>
+  {{#if (eq this.count 2)}}
+    <span class="double-user">
+      {{i18n "notifications.liked_by_2_users" username=this.username username2=this.username2}}
+    </span>
+  {{else if (gt this.count 2)}}
+    <span class="multi-user">
+      {{i18n "notifications.liked_by_multiple_users" username=this.username username2=this.username2 count=this.countMinus2}}
+    </span>
+  {{else}}
+    <span>{{this.username}}</span>
+  {{/if}}
+  <span data-topic-id={{this.topicId}}>
+    {{html-safe this.fancyTitle}}
+  </span>
+</UserMenu::NotificationItemStructure>

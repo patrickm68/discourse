@@ -1,4 +1,4 @@
-import EmberObject, { set } from "@ember/object";
+import { set } from "@ember/object";
 // Subscribes to user events on the message bus
 import {
   alertChannel,
@@ -12,6 +12,7 @@ import {
   unsubscribe as unsubscribePushNotifications,
 } from "discourse/lib/push-notifications";
 import { isTesting } from "discourse-common/config/environment";
+import Notification from "discourse/models/notification";
 
 export default {
   name: "subscribe-user-notifications",
@@ -21,6 +22,7 @@ export default {
     const user = container.lookup("current-user:main");
     const bus = container.lookup("message-bus:main");
     const appEvents = container.lookup("service:app-events");
+    const siteSettings = container.lookup("site-settings:main");
 
     if (user) {
       bus.subscribe("/reviewable_counts", (data) => {
@@ -31,28 +33,32 @@ export default {
         `/notification/${user.get("id")}`,
         (data) => {
           const store = container.lookup("service:store");
-          const oldUnread = user.get("unread_notifications");
-          const oldHighPriority = user.get(
-            "unread_high_priority_notifications"
-          );
+          const oldUnread = user.unread_notifications;
+          const oldHighPriority = user.unread_high_priority_notifications;
+          const oldAllUnread = user.all_unread_notifications;
 
           user.setProperties({
             unread_notifications: data.unread_notifications,
             unread_high_priority_notifications:
               data.unread_high_priority_notifications,
             read_first_notification: data.read_first_notification,
+            all_unread_notifications: data.all_unread_notifications,
+            grouped_unread_high_priority_notifications:
+              data.grouped_unread_high_priority_notifications,
           });
 
           if (
             oldUnread !== data.unread_notifications ||
-            oldHighPriority !== data.unread_high_priority_notifications
+            oldHighPriority !== data.unread_high_priority_notifications ||
+            oldAllUnread !== data.all_unread_notifications
           ) {
             appEvents.trigger("notifications:changed");
 
             if (
               site.mobileView &&
               (data.unread_notifications - oldUnread > 0 ||
-                data.unread_high_priority_notifications - oldHighPriority > 0)
+                data.unread_high_priority_notifications - oldHighPriority > 0 ||
+                data.all_unread_notifications - oldAllUnread > 0)
             ) {
               appEvents.trigger("header:update-topic", null, 5000);
             }
@@ -73,22 +79,24 @@ export default {
             );
 
             if (staleIndex === -1) {
-              // high priority and unread notifications are first
               let insertPosition = 0;
 
-              if (!lastNotification.high_priority || lastNotification.read) {
-                const nextPosition = oldNotifications.findIndex(
-                  (n) => !n.high_priority || n.read
-                );
+              if (!siteSettings.enable_revamped_user_menu) {
+                // high priority and unread notifications are first
+                if (!lastNotification.high_priority || lastNotification.read) {
+                  const nextPosition = oldNotifications.findIndex(
+                    (n) => !n.high_priority || n.read
+                  );
 
-                if (nextPosition !== -1) {
-                  insertPosition = nextPosition;
+                  if (nextPosition !== -1) {
+                    insertPosition = nextPosition;
+                  }
                 }
               }
 
               oldNotifications.insertAt(
                 insertPosition,
-                EmberObject.create(lastNotification)
+                Notification.create(lastNotification)
               );
             }
 
@@ -113,7 +121,6 @@ export default {
       });
 
       const site = container.lookup("site:main");
-      const siteSettings = container.lookup("site-settings:main");
       const router = container.lookup("router:main");
 
       bus.subscribe("/categories", (data) => {

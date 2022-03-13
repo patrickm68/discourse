@@ -472,6 +472,7 @@ class User < ActiveRecord::Base
 
   def reload
     @unread_notifications = nil
+    @all_unread_notifications = nil
     @unread_total_notifications = nil
     @unread_pms = nil
     @unread_bookmarks = nil
@@ -522,6 +523,25 @@ class User < ActiveRecord::Base
     DB.query_single(sql, user_id: id, high_priority: high_priority)[0].to_i
   end
 
+  MAX_UNREAD_HIGH_PRI_BACKLOG = 200
+  def grouped_unread_high_priority_notifications
+    results = DB.query(<<~SQL, user_id: self.id, limit: MAX_UNREAD_HIGH_PRI_BACKLOG)
+      SELECT X.notification_type AS type, COUNT(*) FROM (
+        SELECT n.notification_type
+        FROM notifications n
+        LEFT JOIN topics t ON t.id = n.topic_id
+        WHERE t.deleted_at IS NULL
+          AND n.high_priority
+          AND n.user_id = :user_id
+          AND NOT n.read
+        LIMIT :limit
+      ) AS X
+      GROUP BY X.notification_type
+    SQL
+    results.map! { |record| [record.type, record.count] }
+    results.to_h
+  end
+
   ###
   # DEPRECATED: This is only maintained for backwards compat until v2.5. There
   # may be inconsistencies with counts in the UI because of this, because unread
@@ -569,6 +589,29 @@ class User < ActiveRecord::Base
         seen_notification_id: seen_notification_id,
         limit: User.max_unread_notifications
     )[0].to_i
+    end
+  end
+
+  def all_unread_notifications
+    @all_unread_notifications ||= begin
+      sql = <<~SQL
+        SELECT COUNT(*) FROM (
+          SELECT 1 FROM
+          notifications n
+          LEFT JOIN topics t ON t.id = n.topic_id
+           WHERE t.deleted_at IS NULL AND
+            n.user_id = :user_id AND
+            n.id > :seen_notification_id AND
+            NOT read
+          LIMIT :limit
+        ) AS X
+      SQL
+
+      DB.query_single(sql,
+        user_id: id,
+        seen_notification_id: seen_notification_id,
+        limit: User.max_unread_notifications
+      )[0].to_i
     end
   end
 
@@ -643,6 +686,11 @@ class User < ActiveRecord::Base
       recent: recent,
       seen_notification_id: seen_notification_id,
     }
+
+    if SiteSetting.enable_revamped_user_menu
+      payload[:all_unread_notifications] = all_unread_notifications
+      payload[:grouped_unread_high_priority_notifications] = grouped_unread_high_priority_notifications
+    end
 
     MessageBus.publish("/notification/#{id}", payload, user_ids: [id])
   end

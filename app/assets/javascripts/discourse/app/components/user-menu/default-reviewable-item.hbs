@@ -1,0 +1,9 @@
+<li class={{unless @item.pending "reviewed"}}>
+  {{#link-to "review.show" @item.id}}
+    {{d-icon this.icon}}
+    <div>
+      <span>{{this.actor}}</span>
+      <span>{{this.description}}</span>
+    </div>
+  {{/link-to}}
+</li>

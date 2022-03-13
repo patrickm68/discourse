@@ -1,0 +1,43 @@
+<div class="user-menu revamped menu-panel drop-down" data-max-width="320">
+  <div class="panel-body">
+    <div class="panel-body-contents">
+      <div
+        id={{concat "quick-access-" this.currentTabId}}
+        class="quick-access-panel"
+        tabindex="-1"
+        aria-labelledby={{concat "user-menu-button-" this.currentTabId}}>
+        <this.currentPanelComponent/>
+      </div>
+      <div class="menu-tabs-container" role="tablist" aria-label="Menu links"> <!-- aria-label i18n-->
+        <div class="top-tabs tabs-list">
+          {{#each this.topTabs as |tab|}}
+            <UserMenu::Button
+              @icon={{tab.icon}}
+              @onClick={{fn this.changeTab tab}}
+              id={{concat "user-menu-button-" tab.id}}
+              class={{if (eq tab.id this.currentTabId) "active"}}
+              tabindex={{if (eq tab.id this.currentTabId) "0" "-1"}}
+              aria-selected={{if (eq tab.id this.currentTabId) "true" "false"}}
+              aria-controls={{concat "quick-access-" tab.id}}
+              data-tab-number={{tab.position}}
+            >
+              {{#if tab.count}}
+                <span class="badge-notification">{{tab.count}}</span>
+              {{/if}}
+            </UserMenu::Button>
+          {{/each}}
+        </div>
+        <div class="bottom-tabs tabs-list">
+          {{#each this.bottomTabs as |tab|}}
+            <UserMenu::Button
+              @icon={{tab.icon}}
+              @href={{tab.href}}
+              tabindex={{if (eq tab.id this.currentTabId) "0" "-1"}}
+              data-tab-number={{tab.position}}
+            />
+          {{/each}}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,11 @@
+<li class={{this.className}} ...attributes>
+  {{#if this.url}}
+    <a href={{this.url}} title={{if @title @title}}>
+      {{d-icon this.icon}}
+      <div>{{yield}}</div>
+    </a>
+  {{else}}
+    {{d-icon this.icon}}
+    <div>{{yield}}</div>
+  {{/if}}
+</li>

@@ -30,6 +30,7 @@ const SiteHeaderComponent = MountWidget.extend(
     @observes(
       "currentUser.unread_notifications",
       "currentUser.unread_high_priority_notifications",
+      "currentUser.all_unread_notifications",
       "currentUser.reviewable_count",
       "session.defaultColorSchemeIsDark",
       "session.darkModeAvailable"
@@ -231,6 +232,9 @@ const SiteHeaderComponent = MountWidget.extend(
 
       this.appEvents.on("header:show-topic", this, "setTopic");
       this.appEvents.on("header:hide-topic", this, "setTopic");
+      if (this.siteSettings.enable_revamped_user_menu) {
+        this.appEvents.on("user-menu:rendered", this, "_animateMenu");
+      }
 
       this.dispatch("notifications:changed", "user-notifications");
       this.dispatch("header:keyboard-trigger", "header");
@@ -307,6 +311,9 @@ const SiteHeaderComponent = MountWidget.extend(
       this.appEvents.off("header:show-topic", this, "setTopic");
       this.appEvents.off("header:hide-topic", this, "setTopic");
       this.appEvents.off("dom:clean", this, "_cleanDom");
+      if (this.siteSettings.enable_revamped_user_menu) {
+        this.appEvents.off("user-menu:rendered", this, "_animateMenu");
+      }
 
       cancel(this._scheduledRemoveAnimate);
 
@@ -330,7 +337,10 @@ const SiteHeaderComponent = MountWidget.extend(
           cb(this._topic, headerTitle, "header-title")
         );
       }
+      this._animateMenu();
+    },
 
+    _animateMenu() {
       const menuPanels = document.querySelectorAll(".menu-panel");
       if (menuPanels.length === 0) {
         if (this.site.mobileView) {
@@ -374,7 +384,7 @@ const SiteHeaderComponent = MountWidget.extend(
         // We use a mutationObserver to check for style changes, so it's important
         // we don't set it if it doesn't change. Same goes for the panelBody!
 
-        if (viewMode === "drop-down") {
+        if (!this.site.mobileView) {
           const buttonPanel = document.querySelectorAll("header ul.icons");
           if (buttonPanel.length === 0) {
             return;
@@ -386,23 +396,18 @@ const SiteHeaderComponent = MountWidget.extend(
             panel.style.setProperty("top", "100%");
             panel.style.setProperty("height", "auto");
           }
-
-          document.body.classList.add("drop-down-mode");
         } else {
-          if (this.site.mobileView) {
-            headerCloak.style.display = "block";
-          }
+          headerCloak.style.display = "block";
 
-          const menuTop = this.site.mobileView ? headerTop() : headerOffset();
+          const menuTop = headerTop();
 
-          const winHeightOffset = 16;
+          const winHeightOffset = this.siteSettings.enable_revamped_user_menu
+            ? 0
+            : 16;
           let initialWinHeight = window.innerHeight;
           const winHeight = initialWinHeight - winHeightOffset;
 
-          let height;
-          if (this.site.mobileView) {
-            height = winHeight - menuTop;
-          }
+          let height = winHeight - menuTop;
 
           const isIPadApp = document.body.classList.contains("footer-nav-ipad"),
             heightProp = isIPadApp ? "max-height" : "height",
@@ -425,10 +430,12 @@ const SiteHeaderComponent = MountWidget.extend(
               headerCloak.style.top = `${menuTop}px`;
             }
           }
-          document.body.classList.remove("drop-down-mode");
         }
 
-        panel.style.setProperty("width", `${width}px`);
+        // TODO: handle this better???
+        if (!panel.classList.contains("revamped")) {
+          panel.style.setProperty("width", `${width}px`);
+        }
         if (this._animate) {
           this._animateOpening(panel);
         }
@@ -440,6 +447,7 @@ const SiteHeaderComponent = MountWidget.extend(
 
 export default SiteHeaderComponent.extend({
   classNames: ["d-header-wrap"],
+  classNameBindings: ["site.mobileView::drop-down-mode"],
 });
 
 export function headerTop() {

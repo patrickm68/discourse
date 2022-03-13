@@ -1,0 +1,21 @@
+{{#if @href}}
+  <a
+    class="btn btn-flat btn-icon no-text"
+    role="tab"
+    href={{@href}}
+    ...attributes
+  >
+    {{d-icon @icon}}
+    {{yield}}
+  </a>
+{{else}}
+  <button
+    class="btn btn-flat btn-icon no-text"
+    role="tab"
+    {{on "click" this.onClick}}
+    ...attributes
+  >
+    {{d-icon @icon}}
+    {{yield}}
+  </button>
+{{/if}}
