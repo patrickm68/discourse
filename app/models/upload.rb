@@ -510,6 +510,25 @@ class Upload < ActiveRecord::Base
     problems
   end
 
+  def self.extract_upload_ids(raw)
+    return [] if raw.blank?
+
+    urls = []
+    sha1s = []
+
+    InlineUploads.url_regexps.each do |regexp|
+      raw.scan(regexp).each do |match|
+        urls << match[0]
+        if match[1].present?
+          sha1s << match[1] if match[1] =~ /^\h+$/
+          sha1s << Upload.sha1_from_base62_encoded(match[1]) if match[1] =~ /^[0-9a-zA-Z]+$/
+        end
+      end
+    end
+
+    Upload.where(url: urls.uniq).or(Upload.where(sha1: sha1s.uniq)).pluck(:id)
+  end
+
   private
 
   def short_url_basename
