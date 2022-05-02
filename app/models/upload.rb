@@ -513,20 +513,16 @@ class Upload < ActiveRecord::Base
   def self.extract_upload_ids(raw)
     return [] if raw.blank?
 
-    urls = []
     sha1s = []
 
-    InlineUploads.url_regexps.each do |regexp|
-      raw.scan(regexp).each do |match|
-        urls << match[0]
-        if match[1].present?
-          sha1s << match[1] if match[1] =~ /^\h+$/
-          sha1s << Upload.sha1_from_base62_encoded(match[1]) if match[1] =~ /^[0-9a-zA-Z]+$/
-        end
+    raw.scan(/upload:\/\/([a-zA-Z0-9]+)(?:\..*)?/).each do |match|
+      if match[0].present?
+        sha1s << match[0] if match[0] =~ /^\h+$/
+        sha1s << Upload.sha1_from_base62_encoded(match[0]) if match[0] =~ /^[0-9a-zA-Z]+$/
       end
     end
 
-    Upload.where(url: urls.uniq).or(Upload.where(sha1: sha1s.uniq)).pluck(:id)
+    Upload.where(sha1: sha1s.uniq).pluck(:id)
   end
 
   private

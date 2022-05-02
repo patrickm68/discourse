@@ -7,9 +7,6 @@ class InlineUploads
   UPLOAD_REGEXP_PATTERN = "/original/(\\dX/(?:\\h/)*\\h{40}[a-zA-Z0-9.]*)(\\?v=\\d+)?"
   private_constant :UPLOAD_REGEXP_PATTERN
 
-  HASH_REGEXP_PATTERN = "/original/(?:\\dX/(?:\\h/)*(\\h{40})[a-zA-Z0-9.]*)(\\?v=\\d+)?"
-  private_constant :HASH_REGEXP_PATTERN
-
   def self.process(markdown, on_missing: nil)
     markdown = markdown.dup
 
@@ -217,7 +214,7 @@ class InlineUploads
     end
   end
 
-  def self.url_regexps
+  def self.matched_uploads(node)
     upload_path = Discourse.store.upload_path
     base_url = Discourse.base_url.sub(/https?:\/\//, "(https?://)")
 
@@ -225,35 +222,31 @@ class InlineUploads
       /(upload:\/\/([a-zA-Z0-9]+)[a-zA-Z0-9\.]*)/,
       /(\/uploads\/short-url\/([a-zA-Z0-9]+)[a-zA-Z0-9\.]*)/,
       /(#{base_url}\/uploads\/short-url\/([a-zA-Z0-9]+)[a-zA-Z0-9\.]*)/,
-      /(#{GlobalSetting.relative_url_root}\/#{upload_path}#{HASH_REGEXP_PATTERN})/,
-      /(#{base_url}\/#{upload_path}#{HASH_REGEXP_PATTERN})/,
+      /(#{GlobalSetting.relative_url_root}\/#{upload_path}#{UPLOAD_REGEXP_PATTERN})/,
+      /(#{base_url}\/#{upload_path}#{UPLOAD_REGEXP_PATTERN})/,
     ]
 
     if GlobalSetting.cdn_url && (cdn_url = GlobalSetting.cdn_url.sub(/https?:\/\//, "(https?://)"))
-      regexps << /(#{cdn_url}\/#{upload_path}#{HASH_REGEXP_PATTERN})/
+      regexps << /(#{cdn_url}\/#{upload_path}#{UPLOAD_REGEXP_PATTERN})/
       if GlobalSetting.relative_url_root.present?
-        regexps << /(#{cdn_url}#{GlobalSetting.relative_url_root}\/#{upload_path}#{HASH_REGEXP_PATTERN})/
+        regexps << /(#{cdn_url}#{GlobalSetting.relative_url_root}\/#{upload_path}#{UPLOAD_REGEXP_PATTERN})/
       end
     end
 
     if Discourse.store.external?
       if Rails.configuration.multisite
-        regexps << /((https?:)?#{SiteSetting.Upload.s3_base_url}\/#{upload_path}#{HASH_REGEXP_PATTERN})/
-        regexps << /(#{SiteSetting.Upload.s3_cdn_url}\/#{upload_path}#{HASH_REGEXP_PATTERN})/
+        regexps << /((https?:)?#{SiteSetting.Upload.s3_base_url}\/#{upload_path}#{UPLOAD_REGEXP_PATTERN})/
+        regexps << /(#{SiteSetting.Upload.s3_cdn_url}\/#{upload_path}#{UPLOAD_REGEXP_PATTERN})/
       else
-        regexps << /((https?:)?#{SiteSetting.Upload.s3_base_url}#{HASH_REGEXP_PATTERN})/
-        regexps << /(#{SiteSetting.Upload.s3_cdn_url}#{HASH_REGEXP_PATTERN})/
+        regexps << /((https?:)?#{SiteSetting.Upload.s3_base_url}#{UPLOAD_REGEXP_PATTERN})/
+        regexps << /(#{SiteSetting.Upload.s3_cdn_url}#{UPLOAD_REGEXP_PATTERN})/
       end
     end
 
-    regexps
-  end
-
-  def self.matched_uploads(node)
     matches = []
     node = node.to_s
 
-    url_regexps.each do |regexp|
+    regexps.each do |regexp|
       node.scan(/(^|[\n\s"'\(>])#{regexp}($|[\n\s"'\)<])/) do |matched|
         matches << matched[1]
       end
